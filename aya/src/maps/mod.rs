@@ -54,24 +54,24 @@ use std::{
     marker::PhantomData,
     mem,
     ops::Deref,
-    os::fd::{AsFd, BorrowedFd, OwnedFd},
+    os::fd::{AsFd, BorrowedFd, FromRawFd, OwnedFd},
     path::Path,
     ptr,
 };
 
-use aya_obj::{EbpfSectionKind, InvalidTypeBinding, generated::bpf_map_type, parse_map_info};
-use libc::{RLIM_INFINITY, RLIMIT_MEMLOCK, getrlimit, rlim_t, rlimit};
+use aya_obj::{generated::bpf_map_type, parse_map_info, EbpfSectionKind, InvalidTypeBinding};
+use libc::{getrlimit, rlim_t, rlimit, RLIMIT_MEMLOCK, RLIM_INFINITY};
 use log::warn;
 use thiserror::Error;
 
 use crate::{
-    PinningType, Pod,
     pin::PinError,
     sys::{
-        SyscallError, bpf_create_map, bpf_get_object, bpf_map_freeze, bpf_map_get_fd_by_id,
-        bpf_map_get_next_key, bpf_map_update_elem_ptr, bpf_pin_object,
+        bpf_create_map, bpf_get_object, bpf_map_freeze, bpf_map_get_fd_by_id, bpf_map_get_next_key,
+        bpf_map_update_elem_ptr, bpf_pin_object, SyscallError,
     },
-    util::{KernelVersion, nr_cpus},
+    util::{nr_cpus, KernelVersion},
+    PinningType, Pod,
 };
 
 pub mod array;
@@ -90,7 +90,7 @@ pub mod xdp;
 pub use array::{Array, PerCpuArray, ProgramArray};
 pub use bloom_filter::BloomFilter;
 pub use hash_map::{HashMap, PerCpuHashMap};
-pub use info::{MapInfo, MapType, loaded_maps};
+pub use info::{loaded_maps, MapInfo, MapType};
 pub use lpm_trie::LpmTrie;
 #[cfg(any(feature = "async_tokio", feature = "async_std"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "async_tokio", feature = "async_std"))))]
@@ -544,11 +544,21 @@ pub(crate) fn check_v_size<V>(map: &MapData) -> Result<(), MapError> {
 /// You should never need to use this unless you're implementing a new map type.
 #[derive(Debug)]
 pub struct MapData {
-    obj: aya_obj::Map,
-    fd: MapFd,
+    /// The underlying map object.
+    pub obj: aya_obj::Map,
+    /// The file descriptor for the map.
+    pub fd: MapFd,
 }
 
 impl MapData {
+    /// Creates a new `MapData` from an `aya_obj::Map` and a `MapFd`.
+    pub fn new(obj: aya_obj::Map, raw_fd: u32) -> Self {
+        Self {
+            obj,
+            fd: MapFd::from_fd(unsafe { crate::MockableFd::from_raw_fd(raw_fd as _) }),
+        }
+    }
+
     /// Creates a new map with the provided `name`
     pub fn create(
         mut obj: aya_obj::Map,
@@ -745,7 +755,8 @@ impl MapData {
         fd
     }
 
-    pub(crate) fn obj(&self) -> &aya_obj::Map {
+    /// Returns the underlying `aya_obj::Map` object.
+    pub fn obj(&self) -> &aya_obj::Map {
         let Self { obj, fd: _ } = self;
         obj
     }
@@ -945,15 +956,15 @@ impl<T: Pod> Deref for PerCpuValues<T> {
 #[cfg(test)]
 mod test_utils {
     use aya_obj::{
-        EbpfSectionKind,
         generated::{bpf_cmd, bpf_map_type},
         maps::LegacyMap,
+        EbpfSectionKind,
     };
 
     use crate::{
         bpf_map_def,
         maps::MapData,
-        sys::{Syscall, override_syscall},
+        sys::{override_syscall, Syscall},
     };
 
     pub(super) fn new_map(obj: aya_obj::Map) -> MapData {
@@ -1012,7 +1023,7 @@ mod tests {
     use libc::EFAULT;
 
     use super::*;
-    use crate::sys::{Syscall, override_syscall};
+    use crate::sys::{override_syscall, Syscall};
 
     fn new_obj_map() -> aya_obj::Map {
         test_utils::new_obj_map::<u32>(bpf_map_type::BPF_MAP_TYPE_HASH)

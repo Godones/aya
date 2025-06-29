@@ -56,7 +56,8 @@ pub enum TracePointError {
 #[derive(Debug)]
 #[doc(alias = "BPF_PROG_TYPE_TRACEPOINT")]
 pub struct TracePoint {
-    pub(crate) data: ProgramData<TracePointLink>,
+    /// The program data, which contains the BPF program and its metadata.
+    pub data: ProgramData<TracePointLink>,
 }
 
 impl TracePoint {

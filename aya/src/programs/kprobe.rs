@@ -10,14 +10,14 @@ use aya_obj::generated::{bpf_link_type, bpf_prog_type::BPF_PROG_TYPE_KPROBE};
 use thiserror::Error;
 
 use crate::{
-    VerifierLogLevel,
     programs::{
-        FdLink, LinkError, ProgramData, ProgramError, ProgramType, define_link_wrapper,
-        impl_try_into_fdlink, load_program,
+        define_link_wrapper, impl_try_into_fdlink, load_program,
         perf_attach::{PerfLinkIdInner, PerfLinkInner},
-        probe::{ProbeKind, attach},
+        probe::{attach, ProbeKind},
+        FdLink, LinkError, ProgramData, ProgramError, ProgramType,
     },
     sys::bpf_link_get_info_by_fd,
+    VerifierLogLevel,
 };
 
 /// A kernel probe.
@@ -46,8 +46,10 @@ use crate::{
 #[derive(Debug)]
 #[doc(alias = "BPF_PROG_TYPE_KPROBE")]
 pub struct KProbe {
-    pub(crate) data: ProgramData<KProbeLink>,
-    pub(crate) kind: ProbeKind,
+    /// The program data, which contains the BPF program and its metadata.
+    pub data: ProgramData<KProbeLink>,
+    /// The kind of the probe, either `kprobe` or `kretprobe`.
+    pub kind: ProbeKind,
 }
 
 impl KProbe {

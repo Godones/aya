@@ -8,13 +8,13 @@ use std::{
 };
 
 use aya_obj::{
-    EbpfSectionKind, Features, Object, ParseError, ProgramSection,
     btf::{Btf, BtfError, BtfFeatures, BtfRelocationError},
     generated::{
-        BPF_F_SLEEPABLE, BPF_F_XDP_HAS_FRAGS,
         bpf_map_type::{self, *},
+        BPF_F_SLEEPABLE, BPF_F_XDP_HAS_FRAGS,
     },
     relocation::EbpfRelocationError,
+    EbpfSectionKind, Features, Object, ParseError, ProgramSection,
 };
 use log::{debug, warn};
 use thiserror::Error;
@@ -56,7 +56,7 @@ unsafe_impl_pod!(i8, u8, i16, u16, i32, u32, i64, u64, u128, i128);
 // It only makes sense that an array of POD types is itself POD
 unsafe impl<T: Pod, const N: usize> Pod for [T; N] {}
 
-pub use aya_obj::maps::{PinningType, bpf_map_def};
+pub use aya_obj::maps::{bpf_map_def, PinningType};
 
 pub(crate) static FEATURES: LazyLock<Features> = LazyLock::new(detect_features);
 
@@ -777,7 +777,11 @@ fn adjust_to_page_size(byte_size: u32, page_size: u32) -> u32 {
     fn div_ceil(n: u32, rhs: u32) -> u32 {
         let d = n / rhs;
         let r = n % rhs;
-        if r > 0 && rhs > 0 { d + 1 } else { d }
+        if r > 0 && rhs > 0 {
+            d + 1
+        } else {
+            d
+        }
     }
     let pages_needed = div_ceil(byte_size, page_size);
     page_size * pages_needed.next_power_of_two()
@@ -856,6 +860,11 @@ pub struct Ebpf {
 pub type Bpf = Ebpf;
 
 impl Ebpf {
+    /// Creates a new `Ebpf` instance with the given maps and programs.
+    pub fn new(maps: HashMap<String, Map>, programs: HashMap<String, Program>) -> Self {
+        Ebpf { maps, programs }
+    }
+
     /// Loads eBPF bytecode from a file.
     ///
     /// Parses the given object code file and initializes the [maps](crate::maps) defined in it. If

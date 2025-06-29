@@ -89,8 +89,9 @@ pub use sys::netlink_set_link_up;
 
 // See https://github.com/rust-lang/rust/pull/124210; this structure exists to avoid crashing the
 // process when we try to close a fake file descriptor.
+///  A mockable file descriptor that can be used in tests to simulate
 #[derive(Debug)]
-struct MockableFd {
+pub struct MockableFd {
     #[cfg(not(test))]
     fd: OwnedFd,
     #[cfg(test)]

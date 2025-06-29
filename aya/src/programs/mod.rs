@@ -81,13 +81,13 @@ use std::{
 };
 
 use aya_obj::{
-    VerifierLog,
     btf::BtfError,
     generated::{bpf_attach_type, bpf_prog_info, bpf_prog_type},
     programs::XdpAttachType,
+    VerifierLog,
 };
 use info::impl_info;
-pub use info::{ProgramInfo, ProgramType, loaded_programs};
+pub use info::{loaded_programs, ProgramInfo, ProgramType};
 use libc::ENOSPC;
 use tc::SchedClassifierLink;
 use thiserror::Error;
@@ -124,16 +124,17 @@ pub use crate::programs::{
     xdp::{Xdp, XdpError, XdpFlags},
 };
 use crate::{
-    VerifierLogLevel,
     maps::MapError,
     pin::PinError,
     programs::{links::*, perf_attach::*},
     sys::{
-        EbpfLoadProgramAttrs, NetlinkError, ProgQueryTarget, SyscallError, bpf_btf_get_fd_by_id,
-        bpf_get_object, bpf_link_get_fd_by_id, bpf_load_program, bpf_pin_object,
-        bpf_prog_get_fd_by_id, bpf_prog_query, iter_link_ids, retry_with_verifier_logs,
+        bpf_btf_get_fd_by_id, bpf_get_object, bpf_link_get_fd_by_id, bpf_load_program,
+        bpf_pin_object, bpf_prog_get_fd_by_id, bpf_prog_query, iter_link_ids,
+        retry_with_verifier_logs, EbpfLoadProgramAttrs, NetlinkError, ProgQueryTarget,
+        SyscallError,
     },
     util::KernelVersion,
+    VerifierLogLevel,
 };
 
 /// Error type returned when working with programs.
@@ -494,10 +495,13 @@ impl Program {
     }
 }
 
+/// The data structure that holds the program information and state.
 #[derive(Debug)]
-pub(crate) struct ProgramData<T: Link> {
-    pub(crate) name: Option<Cow<'static, str>>,
-    pub(crate) obj: Option<(aya_obj::Program, aya_obj::Function)>,
+pub struct ProgramData<T: Link> {
+    /// The name of the program, if any.
+    pub name: Option<Cow<'static, str>>,
+    ///  The program object and function, if loaded from an object file.
+    pub obj: Option<(aya_obj::Program, aya_obj::Function)>,
     pub(crate) fd: Option<ProgramFd>,
     pub(crate) links: Links<T>,
     pub(crate) expected_attach_type: Option<bpf_attach_type>,
@@ -511,7 +515,8 @@ pub(crate) struct ProgramData<T: Link> {
 }
 
 impl<T: Link> ProgramData<T> {
-    pub(crate) fn new(
+    /// Creates a new program data structure with the given parameters.
+    pub fn new(
         name: Option<Cow<'static, str>>,
         obj: (aya_obj::Program, aya_obj::Function),
         btf_fd: Option<Arc<crate::MockableFd>>,
